@@ -51,7 +51,7 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		
 		$nested = \NestHydration\NestHydration::nest($table, \NestHydration\NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
 		
-		$this->assertNull($nested, 'should have be a null structure');
+		$this->assertNull($nested, 'should be null');
 	}
 	
 	/**
@@ -61,14 +61,12 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	{
 		$table = array(
 			array('col1' => '1', 'col2' => '2', 'col3' => '3'),
-			array('col1' => '1', 'col2' => '2', 'col3' => '3'),
 		);
 		$propertyMapping = array(array());
 		
 		$nested = \NestHydration\NestHydration::nest($table, \NestHydration\NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
 		
-		$this->assertCount(1, $nested, 'should be list with one item because identical structures get condensed');
-		$this->assertNull($nested[0], 'the structure should be null');
+		$this->assertCount(0, $nested, 'should be an empty list');
 	}
 	
 	/**
@@ -118,6 +116,29 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	/**
 	 * @covers CoursePark\Service\BaseService::nest
 	 */
+	public function testNest_listCondensing()
+	{
+		$table = array(
+			array('col1' => '1', 'col2' => '2', 'col3' => '3'),
+			array('col1' => '1', 'col2' => '2', 'col3' => '3'),
+			array('col1' => '2', 'col2' => '2', 'col3' => '3'),
+		);
+		$propertyMapping = array(array(
+			'col1' => 'col1',
+			'col2' => 'col2',
+			'col3' => 'col3',
+		));
+		
+		$nested = \NestHydration\NestHydration::nest($table, \NestHydration\NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
+		
+		$this->assertCount(2, $nested, 'should be list with two items because one item was condensed');
+		$this->assertEquals(1, $nested[0]['col1'], 'first list item should have column value of 1');
+		$this->assertEquals(2, $nested[1]['col1'], 'first list item should have column value of 2');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
 	public function testNest_singleNestedOneToOne()
 	{
 		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub_1', 'sub_col2' => 'sub_2', 'sub_col3' => 'sub_3');
@@ -142,6 +163,33 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$this->assertArrayHasKey('col1', $nested['sub'], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested['sub'], 'nested sub should have 3 properties in structure');
 		$this->assertEquals('sub_1', $nested['sub']['col1'], 'nested sub should have different value for property');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
+	public function testNest_singleNestedNullOneToOne()
+	{
+		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => null, 'sub_col2' => null, 'sub_col3' => null);
+		$propertyMapping = array(
+			'col1' => 'col1',
+			'col2' => 'col2',
+			'col3' => 'col3',
+			'sub' => array(
+				'col1' => 'sub_col1',
+				'col2' => 'sub_col2',
+				'col3' => 'sub_col3',
+			),
+		);
+		
+		$nested = \NestHydration\NestHydration::nest($table, \NestHydration\NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
+		
+		$this->assertArrayHasKey('col1', $nested, 'should be an associative array');
+		$this->assertEquals('1', $nested['col1'], 'should have value of 1 in property col1');
+		$this->assertCount(4, $nested, 'should have 4 properties in structure');
+		
+		$this->assertArrayHasKey('sub', $nested, 'nested sub should be an associative array');
+		$this->assertNull($nested['sub'], 'nested sub should be null');
 	}
 	
 	/**
@@ -181,6 +229,35 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$this->assertArrayHasKey('col3', $nested['sub'][1], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested['sub'][1], 'nested sub should have 3 properties in structure');
 		$this->assertEquals('sub_3b', $nested['sub'][1]['col3'], 'nested sub should have different value for property');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
+	public function testNest_singleNestedEmptyOneToMany()
+	{
+		$table = array(
+			array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => null, 'sub_col2' => null, 'sub_col3' => null),
+		);
+		$propertyMapping = array(
+			'col1' => 'col1',
+			'col2' => 'col2',
+			'col3' => 'col3',
+			'sub' => array(array(
+				'col1' => 'sub_col1',
+				'col2' => 'sub_col2',
+				'col3' => 'sub_col3',
+			)),
+		);
+		
+		$nested = \NestHydration\NestHydration::nest($table, \NestHydration\NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
+		
+		$this->assertArrayHasKey('col1', $nested, 'should be an associative array');
+		$this->assertEquals('1', $nested['col1'], 'should have value of 1 in property col1');
+		$this->assertCount(4, $nested, 'should have 4 properties in structure');
+		
+		$this->assertArrayHasKey('sub', $nested, 'nested sub should be an associative array');
+		$this->assertCount(0, $nested['sub'], 'should have an empty list');
 	}
 	
 	/**

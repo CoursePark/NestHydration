@@ -43,6 +43,7 @@ class NestHydration
 		}
 		
 		if (empty($propertyMapping)) {
+			// properties is empty, can't form object to return
 			return null;
 		}
 		if (isset($propertyMapping[0]) && empty($propertyMapping[0])) {
@@ -64,10 +65,10 @@ class NestHydration
 				$diff = $row;
 			} else {
 				$diff = array_diff_assoc($row, $lastRow);
-				$lastRow = $row;
 			}
-			
 			static::populateStructure($structure, $diff, $row, $propertyMapping, $identityMapping, $propertyListMap);
+			
+			$lastRow = $row;
 		}
 		
 		return $structure;
@@ -122,7 +123,13 @@ class NestHydration
 			// list of nested structures
 			$identityColumn = current($identityMapping[0]);
 			
-			if ($identityColumn === false || $row[$identityColumn] === null) {
+			if ($identityColumn === false) {
+				return;
+			}
+			
+			if ($row[$identityColumn] === null) {
+				// structure is empty
+				$structure = array();
 				return;
 			}
 			
@@ -138,13 +145,13 @@ class NestHydration
 			return;
 		}
 		
-		// structure
-		if ($structure === null) {
-			$structure = array();
-		}
-		
 		$identityProperty = key($identityMapping);
 		$identityColumn = array_shift($identityMapping);
+		
+		if ($row[$identityColumn] === null) {
+			$structure = null;
+		}
+		
 		if (isset($diff[$identityColumn])) {
 			$structure[$identityProperty] = $diff[$identityColumn];
 			unset($diff[$identityColumn]);
@@ -157,7 +164,9 @@ class NestHydration
 			}
 		}
 		foreach ($identityMapping as $property => $x) {
-			$structure[$property] = array();
+			if (!isset($structure[$property])) {
+				$structure[$property] = is_integer(key($identityMapping[$property])) ? array() : null;
+			}
 			static::populateStructure($structure[$property], $diff, $row, $propertyMapping[$property], $identityMapping[$property], $propertyListMap);
 		}
 	}
