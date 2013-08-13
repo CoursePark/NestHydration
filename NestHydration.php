@@ -4,24 +4,22 @@ namespace NestHydration;
 
 class NestHydration
 {
-	const SPL_OBJECT = 'spl_object';
-	const ASSOCIATIVE_ARRAY = 'associative_array';
+	const SPL_OBJECT = 0;
+	const ASSOCIATIVE_ARRAY = 1;
 	
-	public static function nest($table, $hydrationType = NestHydration::SPL_OBJECT, $propertyMapping = null)
+	/**
+	 * @param array $table must be either an associtative array or a list of
+	 *   assoicative arrays. The columns in the table MUST be strings and not
+	 *   numeric.
+	 * @param SPL_OBJECT|ASSOCIATIVE_ARRAY $resultType
+	 * @param array $propertyMapping
+	 * @return array returns a nested data structure that in accordance to
+	 *   that specified by the $propertyMapping param and populated with data
+	 *   from the $table parameter. Support output of nested associative arrays
+	 *   and lists or nested spl objects and lists.
+	 */
+	public static function nest($table, $resultType = NestHydration::SPL_OBJECT, $propertyMapping = null)
 	{
-		return static::largeNest($table, $propertyMapping);
-	}
-	
-	public static function largeNest($table, $propertyMapping = null)
-	{
-		if ($table instanceof \Doctrine\DBAL\Query\QueryBuilder) {
-			$table = $table->execute();
-		}
-		
-		if ($table instanceof \Doctrine\DBAL\Driver\PDOStatement) {
-			$table = $table->fetchAll(\PDO::FETCH_ASSOC);
-		}
-		
 		if ($table === null) {
 			return null;
 		}
@@ -32,6 +30,10 @@ class NestHydration
 		
 		if (!is_array($propertyMapping) && $propertyMapping !== null) {
 			throw new \Exception('nest expects param propertyMapping to be an array');
+		}
+		
+		if (!in_array($resultType, array(NestHydration::SPL_OBJECT, NestHydration::ASSOCIATIVE_ARRAY))) {
+			$resultType = NestHydration::SPL_OBJECT;
 		}
 		
 		if (!is_integer(key($table)) || empty($table)) {
@@ -66,7 +68,7 @@ class NestHydration
 			} else {
 				$diff = array_diff_assoc($row, $lastRow);
 			}
-			static::populateStructure($structure, $diff, $row, $propertyMapping, $identityMapping, $propertyListMap);
+			static::populateStructure($structure, $diff, $row, $resultType, $propertyMapping, $identityMapping, $propertyListMap);
 			
 			$lastRow = $row;
 		}
@@ -94,7 +96,7 @@ class NestHydration
 	}
 	
 	// create a list of non identity properties by identity column
-	public static function populatePropertyListMap(&$propertyListMap, $propertyMapping)
+	protected static function populatePropertyListMap(&$propertyListMap, $propertyMapping)
 	{
 		if (is_integer(key($propertyMapping))) {
 			static::populatePropertyListMap($propertyListMap, $propertyMapping[0]);
@@ -114,7 +116,7 @@ class NestHydration
 	}
 	
 	// populate structure with new data from row diff
-	protected static function populateStructure(&$structure, &$diff, $row, $propertyMapping, $identityMapping, $propertyListMap)
+	protected static function populateStructure(&$structure, &$diff, $row, $resultType, $propertyMapping, $identityMapping, $propertyListMap)
 	{
 		if (empty($propertyMapping)) {
 			return;
@@ -136,12 +138,12 @@ class NestHydration
 			end($structure);
 			$pos = (integer) key($structure);
 			if (empty($structure)) {
-				$structure[$pos] = array();
+				$structure[$pos] = $resultType === NestHydration::SPL_OBJECT ? new \StdClass : array();
 			} elseif (isset($diff[$identityColumn])) {
-				$structure[++$pos] = array();
+				$structure[++$pos] = $resultType === NestHydration::SPL_OBJECT ? new \StdClass : array();
 			}
 			
-			static::populateStructure($structure[$pos], $diff, $row, $propertyMapping[0], $identityMapping[0], $propertyListMap);
+			static::populateStructure($structure[$pos], $diff, $row, $resultType, $propertyMapping[0], $identityMapping[0], $propertyListMap);
 			return;
 		}
 		
@@ -153,255 +155,37 @@ class NestHydration
 		}
 		
 		if (isset($diff[$identityColumn])) {
-			$structure[$identityProperty] = $diff[$identityColumn];
+			if ($resultType === NestHydration::SPL_OBJECT) {
+				$structurePropertyPointer = &$structure->$identityProperty;
+			} else {
+				$structurePropertyPointer = &$structure[$identityProperty];
+			}
+			$structurePropertyPointer = $diff[$identityColumn];
 			unset($diff[$identityColumn]);
 			
 			foreach ($propertyListMap[$identityColumn] as $property) {
-				$structure[$property] = $row[$propertyMapping[$property]];
+				if ($resultType === NestHydration::SPL_OBJECT) {
+					$structurePropertyPointer = &$structure->$property;
+				} else {
+					$structurePropertyPointer = &$structure[$property];
+				}
+				$structurePropertyPointer = $row[$propertyMapping[$property]];
 				if (isset($diff[$propertyMapping[$property]])) {
 					unset($diff[$propertyMapping[$property]]);
 				}
 			}
 		}
 		foreach ($identityMapping as $property => $x) {
-			if (!isset($structure[$property])) {
-				$structure[$property] = is_integer(key($identityMapping[$property])) ? array() : null;
+			if ($resultType === NestHydration::SPL_OBJECT) {
+				$structurePropertyPointer = &$structure->$property;
+			} else {
+				$structurePropertyPointer = &$structure[$property];
 			}
-			static::populateStructure($structure[$property], $diff, $row, $propertyMapping[$property], $identityMapping[$property], $propertyListMap);
-		}
-	}
-	
-	/**
-	 * @param array $table must be either an associtative array or a list of
-	 *   assoicative arrays. The columns in the table MUST be strings and not
-	 *   numeric.
-	 * @param array $propertyMapping
-	 * @return array returns an associative array containing nested data
-	 *   structures or a list of associative arrays containing nested data
-	 *   structures depending on the nature of the data passed to the table
-	 *   parameter. If null is passed in the table param null is returned.
-	 *   If an empty array is passed in the table param an empty array is
-	 *   returned.
-	 */
-	public static function smallNest($table, $propertyMapping = null)
-	{
-		if ($table instanceof \Doctrine\DBAL\Query\QueryBuilder) {
-			$table = $table->execute();
-		}
-		
-		if ($table instanceof \Doctrine\DBAL\Driver\PDOStatement) {
-			$table = $table->fetchAll(\PDO::FETCH_ASSOC);
-		}
-		
-		if ($table === null) {
-			return null;
-		}
-		
-		if (!is_array($table)) {
-			throw new \Exception('nest expects param table to be an array');
-		}
-		
-		if (!is_array($propertyMapping) && $propertyMapping !== null) {
-			throw new \Exception('nest expects param propertyMapping to be an array');
-		}
-		
-		if (!is_integer(key($table)) || empty($table)) {
-			$table = array($table);
-		}
-		
-		if ($propertyMapping === null) {
-			$propertyMapping = static::propertyMappingFromColumnHints(array_keys($table[0]));
-		}
-		
-		// default is either an empty list or null structure
-		$structure = is_integer(key($propertyMapping)) ? array() : null;
-		
-		$lastRow = null;
-		foreach ($table as $row) {
-			if (!is_array($row)) {
-				throw new \Exception('nest expects param table to contain a list of associative arrays (a table)');
+			if (!isset($structurePropertyPointer)) {
+				$structurePropertyPointer = is_integer(key($identityMapping[$property])) ? array() : null;
 			}
-			
-			foreach ($row as $column => $value) {
-				if (!is_string($column)) {
-					throw new \Exception('nest expects param table to contain a list of associative arrays (a table)');
-				}
-				static::addToStructure($value, $column, $propertyMapping, $structure);
-			}
+			static::populateStructure($structurePropertyPointer, $diff, $row, $resultType, $propertyMapping[$property], $identityMapping[$property], $propertyListMap);
 		}
-		
-		return $structure;
-	}
-	
-	/**
-	 * the engine of the nest function is this recursive function which
-	 * individually takes a value and a column and adds it to the structure
-	 * being assembled in accordance with propertyMapping
-	 */
-	protected static function addToStructure($value, $column, $propertyMapping, &$structure)
-	{
-		if (is_integer(key($propertyMapping))) {
-			$pos = (integer) key($structure); // could be null if empty
-			while (true) { // content will be executed once or twice, no more
-				if (!array_key_exists($pos, $structure)) {
-					$structure[$pos] = null;
-				}
-				
-				$result = static::addToStructure($value, $column, $propertyMapping[0], $structure[$pos]);
-				if ($result !== 'need_new_structure') {
-					// invalid_property or valid_for_structure
-					return $result;
-				}
-				
-				next($structure); // move the internal array pointer
-				$pos++;
-			}
-		}
-		
-		foreach ($propertyMapping as $mapProperty => $mapColumn) {
-			if (!is_string($mapColumn) || $mapColumn !== $column) {
-				continue;
-			}
-			
-			if ($structure === null) {
-				$structure = array();
-			}
-			
-			if (isset($structure[$mapProperty]) && $structure[$mapProperty] !== $value) {
-				return 'need_new_structure';
-			}
-			
-			if (!isset($structure[$mapProperty])) {
-				$structure[$mapProperty] = $value;
-			}
-			
-			return 'valid_for_structure';
-		}
-		
-		foreach ($propertyMapping as $mapProperty => $subPropertyMapping) {
-			if (!is_array($subPropertyMapping)) {
-				continue;
-			}
-			
-			if (!isset($structure[$mapProperty])) {
-				$structure[$mapProperty] = is_integer(key($subPropertyMapping)) ? array() : null;
-			}
-			
-			$result = static::addToStructure($value, $column, $subPropertyMapping, $structure[$mapProperty]);
-			if ($result === 'valid_for_structure') {
-				return $result;
-			}
-		}
-		
-		return 'invalid_property';
-	}
-	
-	public static function smallNestObject($table, $propertyMapping = null)
-	{
-		if ($table instanceof \Doctrine\DBAL\Query\QueryBuilder) {
-			$table = $table->execute();
-		}
-		
-		if ($table instanceof \Doctrine\DBAL\Driver\PDOStatement) {
-			$table = $table->fetchAll(\PDO::FETCH_ASSOC);
-		}
-		
-		if ($table === null) {
-			return null;
-		}
-		
-		if (!is_array($table)) {
-			throw new \Exception('nest expects param table to be an array');
-		}
-		
-		if (!is_array($propertyMapping) && $propertyMapping !== null) {
-			throw new \Exception('nest expects param propertyMapping to be an array');
-		}
-		
-		if (!is_integer(key($table)) || empty($table)) {
-			$table = array($table);
-		}
-		
-		if ($propertyMapping === null) {
-			$propertyMapping = static::propertyMappingFromColumnHints(array_keys($table[0]));
-		}
-		
-		// default is either an empty list or null structure
-		$structure = is_integer(key($propertyMapping)) ? array() : null;
-		
-		$lastRow = null;
-		foreach ($table as $row) {
-			if (!is_array($row)) {
-				throw new \Exception('nest expects param table to contain a list of associative arrays (a table)');
-			}
-			
-			foreach ($row as $column => $value) {
-				if (!is_string($column)) {
-					throw new \Exception('nest expects param table to contain a list of associative arrays (a table)');
-				}
-				static::addToObj($value, $column, $propertyMapping, $structure);
-			}
-		}
-		
-		return $structure;
-	}
-	
-	protected static function addToObj($value, $column, $propertyMapping, &$structure)
-	{
-		if (is_integer(key($propertyMapping))) {
-			$pos = (integer) key($structure); // could be null if empty
-			while (true) { // content will be executed once or twice, no more
-				if (!array_key_exists($pos, $structure)) {
-					$structure[$pos] = null;
-				}
-				
-				$result = static::addToObj($value, $column, $propertyMapping[0], $structure[$pos]);
-				if ($result !== 'need_new_structure') {
-					// invalid_property or valid_for_structure
-					return $result;
-				}
-				
-				next($structure); // move the internal array pointer
-				$pos++;
-			}
-		}
-		
-		foreach ($propertyMapping as $mapProperty => $mapColumn) {
-			if (!is_string($mapColumn) || $mapColumn !== $column) {
-				continue;
-			}
-			
-			if ($structure === null) {
-				$structure = (object) array();
-			}
-			
-			if (isset($structure->$mapProperty) && $structure->$mapProperty !== $value) {
-				return 'need_new_structure';
-			}
-			
-			if (!isset($structure->$mapProperty)) {
-				$structure->$mapProperty = $value;
-			}
-			
-			return 'valid_for_structure';
-		}
-		
-		foreach ($propertyMapping as $mapProperty => $subPropertyMapping) {
-			if (!is_array($subPropertyMapping)) {
-				continue;
-			}
-			
-			if (!isset($structure->$mapProperty)) {
-				$structure->$mapProperty = is_integer(key($subPropertyMapping)) ? array() : null;
-			}
-			
-			$result = static::addToObj($value, $column, $subPropertyMapping, $structure->$mapProperty);
-			if ($result === 'valid_for_structure') {
-				return $result;
-			}
-		}
-		
-		return 'invalid_property';
 	}
 	
 	/**
