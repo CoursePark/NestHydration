@@ -33,14 +33,18 @@ class NestHydration
 		}
 		
 		if (!in_array($resultType, array(NestHydration::SPL_OBJECT, NestHydration::ASSOCIATIVE_ARRAY))) {
+			// invalid result type specified, use default
 			$resultType = NestHydration::SPL_OBJECT;
 		}
 		
 		if (!is_integer(key($table)) || empty($table)) {
+			// internall table should be a table format but an associative
+			// array could be passed as the first (and only) row of that table
 			$table = array($table);
 		}
 		
 		if ($propertyMapping === null) {
+			// property mapping not specified, determine it from column names
 			$propertyMapping = static::propertyMappingFromColumnHints(array_keys($table[0]));
 		}
 		
@@ -49,26 +53,35 @@ class NestHydration
 			return null;
 		}
 		if (isset($propertyMapping[0]) && empty($propertyMapping[0])) {
+			// should return a list but don't know anything about the structure
+			// of the items in the list, return empty list
 			return array();
 		}
 		
+		// precalculate identity columns in advance to row processing, works
+		// by removing columns that don't belong
 		$identityMapping = array_merge_recursive($propertyMapping);
 		static::filterToIdentityMapping($identityMapping);
 		
+		// precalculate list of contained properties for each possible
+		// structure, indexed by identity columns
 		$propertyListMap = array();
 		static::populatePropertyListMap($propertyListMap, $propertyMapping);
 		
 		// default is either an empty list or null structure
 		$structure = is_integer(key($propertyMapping)) ? array() : null;
 		
+		// row by row build up the data structure using the recursive
+		// populate function.
 		$lastRow = null;
 		foreach ($table as $row) {
 			if ($lastRow === null) {
 				$diff = $row;
 			} else {
+				// by knowning the changes populateStructure can be faster
 				$diff = array_diff_assoc($row, $lastRow);
 			}
-			static::populateStructure($structure, $diff, $row, $resultType, $propertyMapping, $identityMapping, $propertyListMap);
+			static::populateStructure($structure, $row, $resultType, $propertyMapping, $diff, $identityMapping, $propertyListMap);
 			
 			$lastRow = $row;
 		}
@@ -76,8 +89,10 @@ class NestHydration
 		return $structure;
 	}
 	
-	// creates identityMapping by filtering out non identity properties
-	// from propertyMapping. used later for efficient iteration
+	/**
+	 * Creates identityMapping by filtering out non identity properties from
+	 * from propertyMapping. Used by nest for efficient iteration.
+	 */
 	protected static function filterToIdentityMapping(&$identityMapping)
 	{
 		if (is_integer(key($identityMapping))) {
@@ -95,14 +110,17 @@ class NestHydration
 		}
 	}
 	
-	// create a list of non identity properties by identity column
+	/**
+	 * Create a list of non identity properties by identity column. Used by
+	 * nest for efficient iteration.
+	 */
 	protected static function populatePropertyListMap(&$propertyListMap, $propertyMapping)
 	{
 		if (is_integer(key($propertyMapping))) {
 			static::populatePropertyListMap($propertyListMap, $propertyMapping[0]);
 			return;
 		}
-		$identityColumn = array_shift($propertyMapping);
+		$identityColumn = current($propertyMapping);
 		foreach ($propertyMapping as $property => $column) {
 			if (is_array($column)) {
 				static::populatePropertyListMap($propertyListMap, $column);
@@ -115,12 +133,17 @@ class NestHydration
 		}
 	}
 	
-	// populate structure with new data from row diff
-	protected static function populateStructure(&$structure, &$diff, $row, $resultType, $propertyMapping, $identityMapping, $propertyListMap)
+	/**
+	 * Populate structure with row data based propertyMapping with useful hints
+	 * coming from diff, identityMapping and propertyListMap
+	 */
+	protected static function populateStructure(&$structure, $row, $resultType, $propertyMapping, $diff, $identityMapping, $propertyListMap)
 	{
 		if (empty($propertyMapping)) {
+			// nothing to do
 			return;
 		}
+		
 		if (is_integer(key($identityMapping))) {
 			// list of nested structures
 			$identityColumn = current($identityMapping[0]);
@@ -138,59 +161,70 @@ class NestHydration
 			end($structure);
 			$pos = (integer) key($structure);
 			if (empty($structure)) {
+				// create first structure in list
 				$structure[$pos] = $resultType === NestHydration::SPL_OBJECT ? new \StdClass : array();
 			} elseif (isset($diff[$identityColumn])) {
+				// structure already exists in list, add to it, increment pos
 				$structure[++$pos] = $resultType === NestHydration::SPL_OBJECT ? new \StdClass : array();
 			}
+			// else structure already identity is same, so any changes must
+			// be deeper in nested structure
 			
-			static::populateStructure($structure[$pos], $diff, $row, $resultType, $propertyMapping[0], $identityMapping[0], $propertyListMap);
+			// populate the structure in the list
+			static::populateStructure($structure[$pos], $row, $resultType, $propertyMapping[0], $diff, $identityMapping[0], $propertyListMap);
 			return;
 		}
 		
+		// not a list, so a structure
+		
+		// get the identity column and property, move identity mapping along
 		$identityProperty = key($identityMapping);
 		$identityColumn = array_shift($identityMapping);
 		
 		if ($row[$identityColumn] === null) {
+			// the identity column null, the structure doesn't exist
 			$structure = null;
 		}
 		
 		if (isset($diff[$identityColumn])) {
-			if ($resultType === NestHydration::SPL_OBJECT) {
-				$structurePropertyPointer = &$structure->$identityProperty;
-			} else {
-				$structurePropertyPointer = &$structure[$identityProperty];
-			}
-			$structurePropertyPointer = $diff[$identityColumn];
-			unset($diff[$identityColumn]);
+			// identity is different so this structure is new
 			
+			// go through properties for structure and copy from row
 			foreach ($propertyListMap[$identityColumn] as $property) {
+				// pointer to the structure property
 				if ($resultType === NestHydration::SPL_OBJECT) {
 					$structurePropertyPointer = &$structure->$property;
 				} else {
 					$structurePropertyPointer = &$structure[$property];
 				}
+				
 				$structurePropertyPointer = $row[$propertyMapping[$property]];
-				if (isset($diff[$propertyMapping[$property]])) {
-					unset($diff[$propertyMapping[$property]]);
-				}
 			}
 		}
+		
+		// go through the nested structures remaining in identityMapping
 		foreach ($identityMapping as $property => $x) {
+			// pointer to the structure property
 			if ($resultType === NestHydration::SPL_OBJECT) {
 				$structurePropertyPointer = &$structure->$property;
 			} else {
 				$structurePropertyPointer = &$structure[$property];
 			}
+			
 			if (!isset($structurePropertyPointer)) {
+				// nested structure doesn't already exist, initialize
 				$structurePropertyPointer = is_integer(key($identityMapping[$property])) ? array() : null;
 			}
-			static::populateStructure($structurePropertyPointer, $diff, $row, $resultType, $propertyMapping[$property], $identityMapping[$property], $propertyListMap);
+			
+			// go into the nested structure
+			static::populateStructure($structurePropertyPointer, $row, $resultType, $propertyMapping[$property], $diff, $identityMapping[$property], $propertyListMap);
 		}
 	}
 	
 	/**
-	 * used internally by nest to build the propertyMapping structure based
-	 * on column names
+	 * Returns a property mapping data structure based on the names of columns
+	 * in columnList. Used internally by nest when its propertyMapping param
+	 * is not specified.
 	 */
 	protected static function propertyMappingFromColumnHints($columnList)
 	{
