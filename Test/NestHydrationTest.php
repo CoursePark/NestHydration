@@ -213,6 +213,43 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	/**
 	 * @covers CoursePark\Service\BaseService::nest
 	 */
+	public function testNest_listNestedOneToOne()
+	{
+		$table = array(
+			array('col1' => '1a', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub_1a', 'sub_col2' => 'sub_2', 'sub_col3' => 'sub_3'),
+			array('col1' => '1b', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub_1b', 'sub_col2' => 'sub_2', 'sub_col3' => 'sub_3'),
+		);
+		$propertyMapping = array(array(
+			'col1' => 'col1',
+			'col2' => 'col2',
+			'col3' => 'col3',
+			'sub' => array(
+				'col1' => 'sub_col1',
+				'col2' => 'sub_col2',
+				'col3' => 'sub_col3',
+			),
+		));
+		
+		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
+		
+		$this->assertArrayHasKey('col1', $nested[0], 'should be an associative array');
+		$this->assertEquals('1a', $nested[0]['col1'], 'should have value of 1 in property col1');
+		$this->assertCount(4, $nested[0], 'should have 4 properties in structure');
+		
+		$this->assertArrayHasKey('sub', $nested[0], 'nested sub should be an associative array');
+		$this->assertArrayHasKey('col1', $nested[0]['sub'], 'nested sub should be an associative array');
+		$this->assertCount(3, $nested[0]['sub'], 'nested sub should have 3 properties in structure');
+		$this->assertEquals('sub_1a', $nested[0]['sub']['col1'], 'nested sub should have different value for property');
+		
+		$this->assertArrayHasKey('sub', $nested[1], 'nested sub should be an associative array');
+		$this->assertArrayHasKey('col1', $nested[1]['sub'], 'nested sub should be an associative array');
+		$this->assertCount(3, $nested[1]['sub'], 'nested sub should have 3 properties in structure');
+		$this->assertEquals('sub_1b', $nested[1]['sub']['col1'], 'nested sub should have different value for property');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
 	public function testNest_singleNestedNullOneToOne()
 	{
 		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => null, 'sub_col2' => null, 'sub_col3' => null);
@@ -473,5 +510,50 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		
 		$this->assertObjectHasAttribute('sub', $nested[1], 'nested sub should have the specified property');
 		$this->assertEquals('sub_2b', $nested[1]->sub[1]->col2, 'nested sub should have different value for property');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
+	public function testNest_autoNesting_singleWithMultipleOneToMany()
+	{
+		$table = array(
+			array('id' => '1', 'subA__id' => '1', 'subB__id' => '1'),
+			array('id' => '1', 'subA__id' => '1', 'subB__id' => '2'),
+			array('id' => '1', 'subA__id' => '2', 'subB__id' => '1'),
+			array('id' => '1', 'subA__id' => '2', 'subB__id' => '2'),
+		);
+		
+		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
+		
+		$this->assertCount(1, $nested, 'should have one item in list');
+		$this->assertCount(2, $nested['subA'], 'should have two item in list');
+		$this->assertCount(2, $nested['subB'], 'should have two item in list');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
+	public function testNest_autoNesting_listWithMultipleOneToMany()
+	{
+		// 3 table each with ids 1 and 2. The first table is join with the
+		// other two by a one-to-many relation. The resulting select ordered
+		// that table by subB.id, subA.id, id.
+		$table = array(
+			array('id' => '1', 'subA__id' => '1', 'subB__id' => '1'),
+			array('id' => '2', 'subA__id' => '1', 'subB__id' => '1'),
+			array('id' => '1', 'subA__id' => '2', 'subB__id' => '1'),
+			array('id' => '2', 'subA__id' => '2', 'subB__id' => '1'),
+			array('id' => '1', 'subA__id' => '1', 'subB__id' => '2'),
+			array('id' => '2', 'subA__id' => '1', 'subB__id' => '2'),
+			array('id' => '1', 'subA__id' => '2', 'subB__id' => '2'),
+			array('id' => '2', 'subA__id' => '2', 'subB__id' => '2'),
+		);
+		
+		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
+		
+		$this->assertCount(2, $nested, 'should have one item in list');
+		$this->assertCount(2, $nested['subA'], 'should have two item in list');
+		$this->assertCount(2, $nested['subB'], 'should have two item in list');
 	}
 }
