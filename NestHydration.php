@@ -184,6 +184,7 @@ class NestHydration
 		if ($row[$identityColumn] === null) {
 			// the identity column null, the structure doesn't exist
 			$structure = null;
+			return;
 		}
 		
 		if (isset($diff[$identityColumn])) {
