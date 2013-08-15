@@ -4,8 +4,8 @@ namespace NestHydration;
 
 class NestHydration
 {
-	const SPL_OBJECT = 0;
-	const ASSOCIATIVE_ARRAY = 1;
+	const SPL_OBJECT = 'object';
+	const ASSOCIATIVE_ARRAY = 'associative';
 	
 	/**
 	 * @param array $table must be either an associtative array or a list of
@@ -71,6 +71,9 @@ class NestHydration
 		// default is either an empty list or null structure
 		$structure = is_integer(key($propertyMapping)) ? array() : null;
 		
+		// initialize map for keys of identity columns to the nested structures
+		$mapByIndentityKeyToStruct = array();
+		
 		// row by row build up the data structure using the recursive
 		// populate function.
 		$lastRow = null;
@@ -81,7 +84,7 @@ class NestHydration
 				// by knowning the changes populateStructure can be faster
 				$diff = array_diff_assoc($row, $lastRow);
 			}
-			static::populateStructure($structure, $row, $resultType, $propertyMapping, $diff, $identityMapping, $propertyListMap);
+			static::populateStructure($structure, $row, $resultType, $propertyMapping, $diff, $identityMapping, $propertyListMap, $mapByIndentityKeyToStruct);
 			
 			$lastRow = $row;
 		}
@@ -137,7 +140,7 @@ class NestHydration
 	 * Populate structure with row data based propertyMapping with useful hints
 	 * coming from diff, identityMapping and propertyListMap
 	 */
-	protected static function populateStructure(&$structure, $row, $resultType, $propertyMapping, $diff, $identityMapping, $propertyListMap)
+	protected static function populateStructure(&$structure, $row, $resultType, $propertyMapping, $diff, $identityMapping, $propertyListMap, &$mapByIndentityKeyToStruct)
 	{
 		if (empty($propertyMapping)) {
 			// nothing to do
@@ -158,20 +161,27 @@ class NestHydration
 				return;
 			}
 			
-			end($structure);
-			$pos = (integer) key($structure);
-			if (empty($structure)) {
-				// create first structure in list
-				$structure[$pos] = $resultType === NestHydration::SPL_OBJECT ? new \StdClass : array();
-			} elseif (isset($diff[$identityColumn])) {
-				// structure already exists in list, add to it, increment pos
-				$structure[++$pos] = $resultType === NestHydration::SPL_OBJECT ? new \StdClass : array();
+			if (isset($mapByIndentityKeyToStruct[$row[$identityColumn]])) {
+				// structure has already been started, further changes would
+				// be nested in deeper structure, get the position in the
+				// list of existing structure
+				$pos = $mapByIndentityKeyToStruct[$row[$identityColumn]][0];
+			} else {
+				if (empty($structure)) {
+					// first in the list
+					$pos = 0;
+				} else {
+					// add to end of the list
+					$pos = count($structure);
+				}
+				// create new structure in the list
+				$structure[$pos] = ($resultType === NestHydration::SPL_OBJECT) ? new \StdClass : array();
+				// store structure identity key for quick reference if needed later
+				$mapByIndentityKeyToStruct[$row[$identityColumn]] = array($pos, array());
 			}
-			// else structure already identity is same, so any changes must
-			// be deeper in nested structure
 			
 			// populate the structure in the list
-			static::populateStructure($structure[$pos], $row, $resultType, $propertyMapping[0], $diff, $identityMapping[0], $propertyListMap);
+			static::populateStructure($structure[$pos], $row, $resultType, $propertyMapping[0], $diff, $identityMapping[0], $propertyListMap, $mapByIndentityKeyToStruct[$row[$identityColumn]][1]);
 			return;
 		}
 		
@@ -215,10 +225,11 @@ class NestHydration
 			if (!isset($structurePropertyPointer)) {
 				// nested structure doesn't already exist, initialize
 				$structurePropertyPointer = is_integer(key($identityMapping[$property])) ? array() : null;
+				$mapByIndentityKeyToStruct[$property] = array();
 			}
 			
 			// go into the nested structure
-			static::populateStructure($structurePropertyPointer, $row, $resultType, $propertyMapping[$property], $diff, $identityMapping[$property], $propertyListMap);
+			static::populateStructure($structurePropertyPointer, $row, $resultType, $propertyMapping[$property], $diff, $identityMapping[$property], $propertyListMap, $mapByIndentityKeyToStruct[$property]);
 		}
 	}
 	

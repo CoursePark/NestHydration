@@ -518,15 +518,14 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	public function testNest_autoNesting_singleWithMultipleOneToMany()
 	{
 		$table = array(
-			array('id' => '1', 'subA__id' => '1', 'subB__id' => '1'),
-			array('id' => '1', 'subA__id' => '1', 'subB__id' => '2'),
-			array('id' => '1', 'subA__id' => '2', 'subB__id' => '1'),
-			array('id' => '1', 'subA__id' => '2', 'subB__id' => '2'),
+			array('id' => 'a', 'subA__id' => 'g', 'subB__id' => 'x'),
+			array('id' => 'a', 'subA__id' => 'g', 'subB__id' => 'y'),
+			array('id' => 'a', 'subA__id' => 'h', 'subB__id' => 'x'),
+			array('id' => 'a', 'subA__id' => 'h', 'subB__id' => 'y'),
 		);
 		
 		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
 		
-		$this->assertCount(1, $nested, 'should have one item in list');
 		$this->assertCount(2, $nested['subA'], 'should have two item in list');
 		$this->assertCount(2, $nested['subB'], 'should have two item in list');
 	}
@@ -540,20 +539,22 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		// other two by a one-to-many relation. The resulting select ordered
 		// that table by subB.id, subA.id, id.
 		$table = array(
-			array('id' => '1', 'subA__id' => '1', 'subB__id' => '1'),
-			array('id' => '2', 'subA__id' => '1', 'subB__id' => '1'),
-			array('id' => '1', 'subA__id' => '2', 'subB__id' => '1'),
-			array('id' => '2', 'subA__id' => '2', 'subB__id' => '1'),
-			array('id' => '1', 'subA__id' => '1', 'subB__id' => '2'),
-			array('id' => '2', 'subA__id' => '1', 'subB__id' => '2'),
-			array('id' => '1', 'subA__id' => '2', 'subB__id' => '2'),
-			array('id' => '2', 'subA__id' => '2', 'subB__id' => '2'),
+			array('_id' => 'a', '_subA__id' => 'g', '_subB__id' => 'x'),
+			array('_id' => 'b', '_subA__id' => 'g', '_subB__id' => 'x'),
+			array('_id' => 'a', '_subA__id' => 'h', '_subB__id' => 'x'),
+			array('_id' => 'b', '_subA__id' => 'h', '_subB__id' => 'x'),
+			array('_id' => 'a', '_subA__id' => 'g', '_subB__id' => 'y'),
+			array('_id' => 'b', '_subA__id' => 'g', '_subB__id' => 'y'),
+			array('_id' => 'a', '_subA__id' => 'h', '_subB__id' => 'y'),
+			array('_id' => 'b', '_subA__id' => 'h', '_subB__id' => 'y'),
 		);
 		
 		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
 		
 		$this->assertCount(2, $nested, 'should have one item in list');
-		$this->assertCount(2, $nested['subA'], 'should have two item in list');
-		$this->assertCount(2, $nested['subB'], 'should have two item in list');
+		$this->assertCount(2, $nested[0]['subA'], 'should have two item in list');
+		$this->assertCount(2, $nested[0]['subB'], 'should have two item in list');
+		$this->assertCount(2, $nested[1]['subA'], 'should have two item in list');
+		$this->assertCount(2, $nested[1]['subB'], 'should have two item in list');
 	}
 }
