@@ -172,7 +172,8 @@ class NestHydration
 					$pos = 0;
 				} else {
 					// add to end of the list
-					$pos = count($structure);
+					end($structure);
+					$pos = key($structure) + 1;
 				}
 				// create new structure in the list
 				$structure[$pos] = ($resultType === NestHydration::SPL_OBJECT) ? new \StdClass : array();
