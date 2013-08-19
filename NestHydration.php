@@ -6,6 +6,7 @@ class NestHydration
 {
 	const SPL_OBJECT = 'object';
 	const ASSOCIATIVE_ARRAY = 'associative';
+	const ARRAY_ACCESS_OBJECT = 'array_access_object';
 	
 	/**
 	 * @param array $table must be either an associtative array or a list of
@@ -18,7 +19,7 @@ class NestHydration
 	 *   from the $table parameter. Support output of nested associative arrays
 	 *   and lists or nested spl objects and lists.
 	 */
-	public static function nest($table, $resultType = NestHydration::SPL_OBJECT, $propertyMapping = null)
+	public static function nest($table, $resultType = NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping = null)
 	{
 		if ($table === null) {
 			return null;
@@ -32,9 +33,9 @@ class NestHydration
 			throw new \Exception('nest expects param propertyMapping to be an array');
 		}
 		
-		if (!in_array($resultType, array(NestHydration::SPL_OBJECT, NestHydration::ASSOCIATIVE_ARRAY))) {
+		if (!in_array($resultType, array(NestHydration::SPL_OBJECT, NestHydration::ASSOCIATIVE_ARRAY, NestHydration::ARRAY_ACCESS_OBJECT))) {
 			// invalid result type specified, use default
-			$resultType = NestHydration::SPL_OBJECT;
+			$resultType = NestHydration::ASSOCIATIVE_ARRAY;
 		}
 		
 		if (!is_integer(key($table)) || empty($table)) {
@@ -176,7 +177,17 @@ class NestHydration
 					$pos = key($structure) + 1;
 				}
 				// create new structure in the list
-				$structure[$pos] = ($resultType === NestHydration::SPL_OBJECT) ? new \StdClass : array();
+				if ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
+					$newStructure = array();
+				} elseif ($resultType === NestHydration::SPL_OBJECT) {
+					$newStructure = new \StdClass;
+				} elseif ($resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
+					$newStructure = new \NestHydration\ArrayAccess();
+				} else {
+					throw new \Exception('invalid result type');
+				}
+				$structure[$pos] = $newStructure;
+				
 				// store structure identity key for quick reference if needed later
 				$mapByIndentityKeyToStruct[$row[$identityColumn]] = array($pos, array());
 			}
@@ -194,8 +205,17 @@ class NestHydration
 		
 		if ($row[$identityColumn] === null) {
 			// the identity column null, the structure doesn't exist
-			$structure = null;
 			return;
+		} elseif ($structure === null) {
+			if ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
+				$structure = array();
+			} elseif ($resultType === NestHydration::SPL_OBJECT) {
+				$structure = new \StdClass;
+			} elseif ($resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
+				$structure = new \NestHydration\ArrayAccess();
+			} else {
+				throw new \Exception('invalid result type');
+			}
 		}
 		
 		if (isset($diff[$identityColumn])) {
@@ -204,10 +224,12 @@ class NestHydration
 			// go through properties for structure and copy from row
 			foreach ($propertyListMap[$identityColumn] as $property) {
 				// pointer to the structure property
-				if ($resultType === NestHydration::SPL_OBJECT) {
+				if ($resultType === NestHydration::SPL_OBJECT || $resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
 					$structurePropertyPointer = &$structure->$property;
-				} else {
+				} elseif ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
 					$structurePropertyPointer = &$structure[$property];
+				} else {
+					throw new \Exception('invalid result type');
 				}
 				
 				$structurePropertyPointer = $row[$propertyMapping[$property]];
@@ -217,10 +239,12 @@ class NestHydration
 		// go through the nested structures remaining in identityMapping
 		foreach ($identityMapping as $property => $x) {
 			// pointer to the structure property
-			if ($resultType === NestHydration::SPL_OBJECT) {
+			if ($resultType === NestHydration::SPL_OBJECT || $resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
 				$structurePropertyPointer = &$structure->$property;
-			} else {
+			} elseif ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
 				$structurePropertyPointer = &$structure[$property];
+			} else {
+				throw new \Exception('invalid result type');
 			}
 			
 			if (!isset($structurePropertyPointer)) {
