@@ -381,6 +381,29 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	/**
 	 * @covers CoursePark\Service\BaseService::nest
 	 */
+	public function testNest_manyToOneRelation()
+	{
+		$table = array(
+			array('col1' => 'a', 'sub_col1' => 'g'),
+			array('col1' => 'b', 'sub_col1' => 'g'),
+		);
+		$propertyMapping = array(array(
+			'col1' => 'col1',
+			'sub' => array(
+				'col1' => 'sub_col1',
+			),
+		));
+		
+		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
+		
+		$this->assertCount(2, $nested, 'should have one item in list');
+		$this->assertArrayHasKey('col1', $nested[0]['sub'], 'should have property in sub item');
+		$this->assertArrayHasKey('col1', $nested[1]['sub'], 'should have property in sub item');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
 	public function testNest_autoNesting_isStructure()
 	{
 		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3');
@@ -564,14 +587,14 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	public function testNest_autoNesting_manyToOneRelation()
 	{
 		$table = array(
-			array('_id' => 'a', '_subA_id' => 'g'),
-			array('_id' => 'b', '_subA_id' => 'g'),
+			array('_id' => 'a', '_sub_id' => 'g'),
+			array('_id' => 'b', '_sub_id' => 'g'),
 		);
 		
 		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
 		
 		$this->assertCount(2, $nested, 'should have one item in list');
-		$this->assertArrayHasKey('id', $nested[0]['subA'], 'should have property in sub item');
-		$this->assertArrayHasKey('id', $nested[1]['subA'], 'should have property in sub item');
+		$this->assertArrayHasKey('id', $nested[0]['sub'], 'should have property in sub item');
+		$this->assertArrayHasKey('id', $nested[1]['sub'], 'should have property in sub item');
 	}
 }

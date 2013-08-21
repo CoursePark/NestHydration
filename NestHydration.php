@@ -77,17 +77,8 @@ class NestHydration
 		
 		// row by row build up the data structure using the recursive
 		// populate function.
-		$lastRow = null;
 		foreach ($table as $row) {
-			if ($lastRow === null) {
-				$diff = $row;
-			} else {
-				// by knowning the changes populateStructure can be faster
-				$diff = array_diff_assoc($row, $lastRow);
-			}
-			static::populateStructure($structure, $row, $resultType, $propertyMapping, $diff, $identityMapping, $propertyListMap, $mapByIndentityKeyToStruct);
-			
-			$lastRow = $row;
+			static::populateStructure($structure, $row, $resultType, $propertyMapping, $identityMapping, $propertyListMap, $mapByIndentityKeyToStruct);
 		}
 		
 		return $structure;
@@ -141,7 +132,7 @@ class NestHydration
 	 * Populate structure with row data based propertyMapping with useful hints
 	 * coming from diff, identityMapping and propertyListMap
 	 */
-	protected static function populateStructure(&$structure, $row, $resultType, $propertyMapping, $diff, $identityMapping, $propertyListMap, &$mapByIndentityKeyToStruct)
+	protected static function populateStructure(&$structure, $row, $resultType, $propertyMapping, $identityMapping, $propertyListMap, &$mapByIndentityKeyToStruct)
 	{
 		if (empty($propertyMapping)) {
 			// nothing to do
@@ -193,7 +184,7 @@ class NestHydration
 			}
 			
 			// populate the structure in the list
-			static::populateStructure($structure[$pos], $row, $resultType, $propertyMapping[0], $diff, $identityMapping[0], $propertyListMap, $mapByIndentityKeyToStruct[$row[$identityColumn]][1]);
+			static::populateStructure($structure[$pos], $row, $resultType, $propertyMapping[0], $identityMapping[0], $propertyListMap, $mapByIndentityKeyToStruct[$row[$identityColumn]][1]);
 			return;
 		}
 		
@@ -218,22 +209,18 @@ class NestHydration
 			}
 		}
 		
-		if (isset($diff[$identityColumn])) {
-			// identity is different so this structure is new
-			
-			// go through properties for structure and copy from row
-			foreach ($propertyListMap[$identityColumn] as $property) {
-				// pointer to the structure property
-				if ($resultType === NestHydration::SPL_OBJECT || $resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
-					$structurePropertyPointer = &$structure->$property;
-				} elseif ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
-					$structurePropertyPointer = &$structure[$property];
-				} else {
-					throw new \Exception('invalid result type');
-				}
-				
-				$structurePropertyPointer = $row[$propertyMapping[$property]];
+		// go through properties for structure and copy from row
+		foreach ($propertyListMap[$identityColumn] as $property) {
+			// pointer to the structure property
+			if ($resultType === NestHydration::SPL_OBJECT || $resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
+				$structurePropertyPointer = &$structure->$property;
+			} elseif ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
+				$structurePropertyPointer = &$structure[$property];
+			} else {
+				throw new \Exception('invalid result type');
 			}
+			
+			$structurePropertyPointer = $row[$propertyMapping[$property]];
 		}
 		
 		// go through the nested structures remaining in identityMapping
@@ -254,7 +241,7 @@ class NestHydration
 			}
 			
 			// go into the nested structure
-			static::populateStructure($structurePropertyPointer, $row, $resultType, $propertyMapping[$property], $diff, $identityMapping[$property], $propertyListMap, $mapByIndentityKeyToStruct[$property]);
+			static::populateStructure($structurePropertyPointer, $row, $resultType, $propertyMapping[$property], $identityMapping[$property], $propertyListMap, $mapByIndentityKeyToStruct[$property]);
 		}
 	}
 	
