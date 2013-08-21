@@ -557,4 +557,21 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$this->assertCount(2, $nested[1]['subA'], 'should have two item in list');
 		$this->assertCount(2, $nested[1]['subB'], 'should have two item in list');
 	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
+	public function testNest_autoNesting_manyToOneRelation()
+	{
+		$table = array(
+			array('_id' => 'a', '_subA_id' => 'g'),
+			array('_id' => 'b', '_subA_id' => 'g'),
+		);
+		
+		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
+		
+		$this->assertCount(2, $nested, 'should have one item in list');
+		$this->assertArrayHasKey('id', $nested[0]['subA'], 'should have property in sub item');
+		$this->assertArrayHasKey('id', $nested[1]['subA'], 'should have property in sub item');
+	}
 }
