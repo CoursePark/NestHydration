@@ -404,6 +404,30 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	/**
 	 * @covers CoursePark\Service\BaseService::nest
 	 */
+	public function testNest_autoNesting_emptyStructure()
+	{
+		$table = array();
+		
+		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
+		
+		$this->assertNull($nested, 'should return null (empty structure) when auto determination of structure can not be determined because table is empty and propertyMapping is null');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
+	public function testNest_autoNesting_emptyList()
+	{
+		$table = array();
+		
+		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY, true);
+		
+		$this->assertCount(0, $nested, 'should return empty array when auto determination of structure can not be determined because table is empty and propertyMapping is true');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
 	public function testNest_autoNesting_isStructure()
 	{
 		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3');

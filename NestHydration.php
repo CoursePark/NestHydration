@@ -13,7 +13,7 @@ class NestHydration
 	 *   assoicative arrays. The columns in the table MUST be strings and not
 	 *   numeric.
 	 * @param SPL_OBJECT|ASSOCIATIVE_ARRAY $resultType
-	 * @param array $propertyMapping
+	 * @param array|null|true $propertyMapping
 	 * @return array returns a nested data structure that in accordance to
 	 *   that specified by the $propertyMapping param and populated with data
 	 *   from the $table parameter. Support output of nested associative arrays
@@ -29,8 +29,8 @@ class NestHydration
 			throw new \Exception('nest expects param table to be an array');
 		}
 		
-		if (!is_array($propertyMapping) && $propertyMapping !== null) {
-			throw new \Exception('nest expects param propertyMapping to be an array');
+		if (!is_array($propertyMapping) && $propertyMapping !== null && $propertyMapping !== true) {
+			throw new \Exception('nest expects param propertyMapping to be an array, null, or true');
 		}
 		
 		if (!in_array($resultType, array(NestHydration::SPL_OBJECT, NestHydration::ASSOCIATIVE_ARRAY, NestHydration::ARRAY_ACCESS_OBJECT))) {
@@ -44,14 +44,24 @@ class NestHydration
 			$table = array($table);
 		}
 		
+		// propertyMapping can be set to true as a tie break between returning
+		// null (empty structure) or an empty list
+		if ($propertyMapping === true) {
+			$listOnEmpty = true;
+			$propertyMapping = null;
+		} else {
+			$listOnEmpty = false;
+		}
+		
 		if ($propertyMapping === null) {
 			// property mapping not specified, determine it from column names
 			$propertyMapping = static::propertyMappingFromColumnHints(array_keys($table[0]));
 		}
 		
 		if (empty($propertyMapping)) {
-			// properties is empty, can't form object to return
-			return null;
+			// properties is empty, can't form structure or determine content
+			// for a list. Assume a structure unless listOnEmpty
+			return $listOnEmpty ? array() : null;
 		}
 		if (isset($propertyMapping[0]) && empty($propertyMapping[0])) {
 			// should return a list but don't know anything about the structure
