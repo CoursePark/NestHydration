@@ -46,6 +46,23 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	/**
 	 * @covers CoursePark\Service\BaseService::nest
 	 */
+	public function testNest_empty_withProperties()
+	{
+		$table = array();
+		$propertyMapping = array(
+			'col1' => 'col1',
+			'col2' => 'col2',
+			'col3' => 'col3',
+		);
+		
+		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
+		
+		$this->assertEmpty($nested, 'should return empty array when passed empty array as table param');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
 	public function testNest_noProperties()
 	{
 		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3');
