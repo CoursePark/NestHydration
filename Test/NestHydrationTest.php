@@ -186,7 +186,7 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	 */
 	public function testNest_singleNestedOneToOne()
 	{
-		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub_1', 'sub_col2' => 'sub_2', 'sub_col3' => 'sub_3');
+		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub 1', 'sub_col2' => 'sub 2', 'sub_col3' => 'sub 3');
 		$propertyMapping = array(
 			'col1' => 'col1',
 			'col2' => 'col2',
@@ -207,7 +207,7 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$this->assertArrayHasKey('sub', $nested, 'nested sub should be an associative array');
 		$this->assertArrayHasKey('col1', $nested['sub'], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested['sub'], 'nested sub should have 3 properties in structure');
-		$this->assertEquals('sub_1', $nested['sub']['col1'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 1', $nested['sub']['col1'], 'nested sub should have different value for property');
 	}
 	
 	/**
@@ -216,8 +216,8 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	public function testNest_listNestedOneToOne()
 	{
 		$table = array(
-			array('col1' => '1a', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub_1a', 'sub_col2' => 'sub_2', 'sub_col3' => 'sub_3'),
-			array('col1' => '1b', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub_1b', 'sub_col2' => 'sub_2', 'sub_col3' => 'sub_3'),
+			array('col1' => '1a', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub 1a', 'sub_col2' => 'sub 2', 'sub_col3' => 'sub 3'),
+			array('col1' => '1b', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub 1b', 'sub_col2' => 'sub 2', 'sub_col3' => 'sub 3'),
 		);
 		$propertyMapping = array(array(
 			'col1' => 'col1',
@@ -239,12 +239,12 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$this->assertArrayHasKey('sub', $nested[0], 'nested sub should be an associative array');
 		$this->assertArrayHasKey('col1', $nested[0]['sub'], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested[0]['sub'], 'nested sub should have 3 properties in structure');
-		$this->assertEquals('sub_1a', $nested[0]['sub']['col1'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 1a', $nested[0]['sub']['col1'], 'nested sub should have different value for property');
 		
 		$this->assertArrayHasKey('sub', $nested[1], 'nested sub should be an associative array');
 		$this->assertArrayHasKey('col1', $nested[1]['sub'], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested[1]['sub'], 'nested sub should have 3 properties in structure');
-		$this->assertEquals('sub_1b', $nested[1]['sub']['col1'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 1b', $nested[1]['sub']['col1'], 'nested sub should have different value for property');
 	}
 	
 	/**
@@ -280,8 +280,8 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	public function testNest_singleNestedOneToMany()
 	{
 		$table = array(
-			array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub_1a', 'sub_col2' => 'sub_2a', 'sub_col3' => 'sub_3a'),
-			array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub_1b', 'sub_col2' => 'sub_2b', 'sub_col3' => 'sub_3b'),
+			array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub 1a', 'sub_col2' => 'sub 2a', 'sub_col3' => 'sub 3a'),
+			array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub 1b', 'sub_col2' => 'sub 2b', 'sub_col3' => 'sub 3b'),
 		);
 		$propertyMapping = array(
 			'col1' => 'col1',
@@ -306,11 +306,11 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		
 		$this->assertArrayHasKey('col2', $nested['sub'][0], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested['sub'][0], 'nested sub should have 3 properties in structure');
-		$this->assertEquals('sub_2a', $nested['sub'][0]['col2'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 2a', $nested['sub'][0]['col2'], 'nested sub should have different value for property');
 		
 		$this->assertArrayHasKey('col3', $nested['sub'][1], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested['sub'][1], 'nested sub should have 3 properties in structure');
-		$this->assertEquals('sub_3b', $nested['sub'][1]['col3'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 3b', $nested['sub'][1]['col3'], 'nested sub should have different value for property');
 	}
 	
 	/**
@@ -348,10 +348,10 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	public function testNest_listWithNestedOneToMany()
 	{
 		$table = array(
-			array('col1' => '1a', 'col2' => '2a', 'col3' => '3a', 'sub_col1' => 'sub_1a', 'sub_col2' => 'sub_2a', 'sub_col3' => 'sub_3a'),
-			array('col1' => '1a', 'col2' => '2a', 'col3' => '3a', 'sub_col1' => 'sub_1b', 'sub_col2' => 'sub_2b', 'sub_col3' => 'sub_3b'),
-			array('col1' => '1b', 'col2' => '2b', 'col3' => '3b', 'sub_col1' => 'sub_1a', 'sub_col2' => 'sub_2a', 'sub_col3' => 'sub_3a'),
-			array('col1' => '1b', 'col2' => '2b', 'col3' => '3b', 'sub_col1' => 'sub_1b', 'sub_col2' => 'sub_2b', 'sub_col3' => 'sub_3b'),
+			array('col1' => '1a', 'col2' => '2a', 'col3' => '3a', 'sub_col1' => 'sub 1a', 'sub_col2' => 'sub 2a', 'sub_col3' => 'sub 3a'),
+			array('col1' => '1a', 'col2' => '2a', 'col3' => '3a', 'sub_col1' => 'sub 1b', 'sub_col2' => 'sub 2b', 'sub_col3' => 'sub 3b'),
+			array('col1' => '1b', 'col2' => '2b', 'col3' => '3b', 'sub_col1' => 'sub 1a', 'sub_col2' => 'sub 2a', 'sub_col3' => 'sub 3a'),
+			array('col1' => '1b', 'col2' => '2b', 'col3' => '3b', 'sub_col1' => 'sub 1b', 'sub_col2' => 'sub 2b', 'sub_col3' => 'sub 3b'),
 		);
 		$propertyMapping = array(array(
 			'col1' => 'col1',
@@ -372,10 +372,10 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$this->assertEquals('3a', $nested[0]['col3'], 'should have different value for property');
 		
 		$this->assertArrayHasKey('sub', $nested[0], 'nested sub should be an associative array');
-		$this->assertEquals('sub_3a', $nested[0]['sub'][0]['col3'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 3a', $nested[0]['sub'][0]['col3'], 'nested sub should have different value for property');
 		
 		$this->assertArrayHasKey('sub', $nested[1], 'nested sub should be an associative array');
-		$this->assertEquals('sub_2b', $nested[1]['sub'][1]['col2'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 2b', $nested[1]['sub'][1]['col2'], 'nested sub should have different value for property');
 	}
 	
 	/**
@@ -464,7 +464,7 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	 */
 	public function testNest_autoNesting_singleNestedOneToOne()
 	{
-		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub_1', 'sub_col2' => 'sub_2', 'sub_col3' => 'sub_3');
+		$table = array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub_col1' => 'sub 1', 'sub_col2' => 'sub 2', 'sub_col3' => 'sub 3');
 		
 		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
 		
@@ -475,7 +475,7 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$this->assertArrayHasKey('sub', $nested, 'nested sub should be an associative array');
 		$this->assertArrayHasKey('col1', $nested['sub'], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested['sub'], 'nested sub should have 3 properties in structure');
-		$this->assertEquals('sub_1', $nested['sub']['col1'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 1', $nested['sub']['col1'], 'nested sub should have different value for property');
 	}
 	
 	/**
@@ -484,8 +484,8 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	public function testNest_autoNesting_singleNestedOneToMany()
 	{
 		$table = array(
-			array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub__col1' => 'sub_1a', 'sub__col2' => 'sub_2a', 'sub__col3' => 'sub_3a'),
-			array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub__col1' => 'sub_1b', 'sub__col2' => 'sub_2b', 'sub__col3' => 'sub_3b'),
+			array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub__col1' => 'sub 1a', 'sub__col2' => 'sub 2a', 'sub__col3' => 'sub 3a'),
+			array('col1' => '1', 'col2' => '2', 'col3' => '3', 'sub__col1' => 'sub 1b', 'sub__col2' => 'sub 2b', 'sub__col3' => 'sub 3b'),
 		);
 		
 		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
@@ -500,11 +500,11 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		
 		$this->assertArrayHasKey('col2', $nested['sub'][0], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested['sub'][0], 'nested sub should have 3 properties in structure');
-		$this->assertEquals('sub_2a', $nested['sub'][0]['col2'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 2a', $nested['sub'][0]['col2'], 'nested sub should have different value for property');
 		
 		$this->assertArrayHasKey('col3', $nested['sub'][1], 'nested sub should be an associative array');
 		$this->assertCount(3, $nested['sub'][1], 'nested sub should have 3 properties in structure');
-		$this->assertEquals('sub_3b', $nested['sub'][1]['col3'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 3b', $nested['sub'][1]['col3'], 'nested sub should have different value for property');
 	}
 	
 	/**
@@ -513,10 +513,10 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	public function testNest_autoNesting_listWithNestedOneToMany()
 	{
 		$table = array(
-			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub_1a', '_sub__col2' => 'sub_2a', '_sub__col3' => 'sub_3a'),
-			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub_1b', '_sub__col2' => 'sub_2b', '_sub__col3' => 'sub_3b'),
-			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub_1a', '_sub__col2' => 'sub_2a', '_sub__col3' => 'sub_3a'),
-			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub_1b', '_sub__col2' => 'sub_2b', '_sub__col3' => 'sub_3b'),
+			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub 1a', '_sub__col2' => 'sub 2a', '_sub__col3' => 'sub 3a'),
+			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub 1b', '_sub__col2' => 'sub 2b', '_sub__col3' => 'sub 3b'),
+			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub 1a', '_sub__col2' => 'sub 2a', '_sub__col3' => 'sub 3a'),
+			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub 1b', '_sub__col2' => 'sub 2b', '_sub__col3' => 'sub 3b'),
 		);
 		
 		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY);
@@ -527,10 +527,10 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$this->assertEquals('3a', $nested[0]['col3'], 'should have different value for property');
 		
 		$this->assertArrayHasKey('sub', $nested[0], 'nested sub should be an associative array');
-		$this->assertEquals('sub_3a', $nested[0]['sub'][0]['col3'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 3a', $nested[0]['sub'][0]['col3'], 'nested sub should have different value for property');
 		
 		$this->assertArrayHasKey('sub', $nested[1], 'nested sub should be an associative array');
-		$this->assertEquals('sub_2b', $nested[1]['sub'][1]['col2'], 'nested sub should have different value for property');
+		$this->assertEquals('sub 2b', $nested[1]['sub'][1]['col2'], 'nested sub should have different value for property');
 	}
 	
 	/**
@@ -539,10 +539,10 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	public function testNest_autoNesting_listWithNestedOneToManyObj()
 	{
 		$table = array(
-			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub_1a', '_sub__col2' => 'sub_2a', '_sub__col3' => 'sub_3a'),
-			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub_1b', '_sub__col2' => 'sub_2b', '_sub__col3' => 'sub_3b'),
-			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub_1a', '_sub__col2' => 'sub_2a', '_sub__col3' => 'sub_3a'),
-			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub_1b', '_sub__col2' => 'sub_2b', '_sub__col3' => 'sub_3b'),
+			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub 1a', '_sub__col2' => 'sub 2a', '_sub__col3' => 'sub 3a'),
+			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub 1b', '_sub__col2' => 'sub 2b', '_sub__col3' => 'sub 3b'),
+			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub 1a', '_sub__col2' => 'sub 2a', '_sub__col3' => 'sub 3a'),
+			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub 1b', '_sub__col2' => 'sub 2b', '_sub__col3' => 'sub 3b'),
 		);
 		
 		$nested = NestHydration::nest($table, NestHydration::SPL_OBJECT);
@@ -553,10 +553,10 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$this->assertEquals('3a', $nested[0]->col3, 'should have different value for property');
 		
 		$this->assertObjectHasAttribute('sub', $nested[0], 'nested sub should have the specified property');
-		$this->assertEquals('sub_3a', $nested[0]->sub[0]->col3, 'nested sub should have different value for property');
+		$this->assertEquals('sub 3a', $nested[0]->sub[0]->col3, 'nested sub should have different value for property');
 		
 		$this->assertObjectHasAttribute('sub', $nested[1], 'nested sub should have the specified property');
-		$this->assertEquals('sub_2b', $nested[1]->sub[1]->col2, 'nested sub should have different value for property');
+		$this->assertEquals('sub 2b', $nested[1]->sub[1]->col2, 'nested sub should have different value for property');
 	}
 	
 	/**
