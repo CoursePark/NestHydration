@@ -22,6 +22,6 @@ class ArrayAccess
 	
 	public function offsetExists($offset)
 	{
-		isset($this->$offset);
+		return isset($this->$offset);
 	}
 }
