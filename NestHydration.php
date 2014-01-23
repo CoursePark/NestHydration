@@ -38,19 +38,25 @@ class NestHydration
 			$resultType = NestHydration::ASSOCIATIVE_ARRAY;
 		}
 		
-		if (!is_integer(key($table)) || empty($table)) {
-			// internall table should be a table format but an associative
-			// array could be passed as the first (and only) row of that table
-			$table = array($table);
-		}
-		
 		// propertyMapping can be set to true as a tie break between returning
 		// null (empty structure) or an empty list
 		if ($propertyMapping === true) {
 			$listOnEmpty = true;
 			$propertyMapping = null;
+		} elseif (is_array($propertyMapping) && is_integer(key($propertyMapping))) {
+			$listOnEmpty = true;
 		} else {
 			$listOnEmpty = false;
+		}
+		
+		if (empty($table)) {
+			return $listOnEmpty ? array() : null;
+		}
+		
+		if (!is_integer(key($table))) {
+			// internal table should be a table format but an associative
+			// array could be passed as the first (and only) row of that table
+			$table = array($table);
 		}
 		
 		if ($propertyMapping === null) {
@@ -260,7 +266,7 @@ class NestHydration
 	 * in columnList. Used internally by nest when its propertyMapping param
 	 * is not specified.
 	 */
-	protected static function propertyMappingFromColumnHints($columnList)
+	public static function propertyMappingFromColumnHints($columnList)
 	{
 		$propertyMapping = array();
 		
