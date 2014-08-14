@@ -9,28 +9,30 @@ class NestHydration
 	const ARRAY_ACCESS_OBJECT = 'array_access_object';
 	
 	/**
-	 * @param array $table must be either an associtative array or a list of
+	 * Creates a data structure containing nested objects and/or arrays from
+	 * tabular data based on a structure definition provided by
+	 * structPropToColumnMap. If structPropToColumnMap is not provided but
+	 * the data has column names that follow a particular convention then nested
+	 * nested structures can also be created.
+	 *
+	 * @param array $data must be either an associtative array or a list of
 	 *   assoicative arrays. The columns in the table MUST be strings and not
 	 *   numeric.
 	 * @param SPL_OBJECT|ASSOCIATIVE_ARRAY $resultType
 	 * @param array|null|true $propertyMapping
 	 * @return array returns a nested data structure that in accordance to
 	 *   that specified by the $propertyMapping param and populated with data
-	 *   from the $table parameter. Support output of nested associative arrays
+	 *   from the $data parameter. Support output of nested associative arrays
 	 *   and lists or nested spl objects and lists.
 	 */
-	public static function nest($table, $resultType = NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping = null)
-	{
-		if ($table === null) {
+	public static function nest($data, $resultType = NestHydration::ASSOCIATIVE_ARRAY, $structPropToColumnMap = null) {
+		// VALIDATE PARAMS AND BASIC INITIALIZATION
+		
+		$listOnEmpty = false;
+		$columnList = null;
+		
+		if ($data === null) {
 			return null;
-		}
-		
-		if (!is_array($table)) {
-			throw new \Exception('nest expects param table to be an array');
-		}
-		
-		if (!is_array($propertyMapping) && $propertyMapping !== null && $propertyMapping !== true) {
-			throw new \Exception('nest expects param propertyMapping to be an array, null, or true');
 		}
 		
 		if (!in_array($resultType, array(NestHydration::SPL_OBJECT, NestHydration::ASSOCIATIVE_ARRAY, NestHydration::ARRAY_ACCESS_OBJECT))) {
@@ -38,227 +40,263 @@ class NestHydration
 			$resultType = NestHydration::ASSOCIATIVE_ARRAY;
 		}
 		
-		// propertyMapping can be set to true as a tie break between returning
-		// null (empty structure) or an empty list
-		if ($propertyMapping === true) {
-			$listOnEmpty = true;
-			$propertyMapping = null;
-		} elseif (is_array($propertyMapping) && is_integer(key($propertyMapping))) {
-			$listOnEmpty = true;
-		} else {
-			$listOnEmpty = false;
+		if (!is_array($structPropToColumnMap) && $structPropToColumnMap !== null && $structPropToColumnMap !== true) {
+			throw new \Exception('nest expects param propertyMapping to be an array, plain object, null, or true');
 		}
 		
-		if (empty($table)) {
+		// propertyMapping can be set to true as a tie break between
+		// returning null (empty structure) or an empty list
+		if ($structPropToColumnMap === true) {
+			$listOnEmpty = true;
+			$structPropToColumnMap = null;
+		} elseif (is_array($structPropToColumnMap) && is_integer(key($structPropToColumnMap))) {
+			$listOnEmpty = true;
+		}
+		
+		if (empty($data)) {
 			return $listOnEmpty ? array() : null;
 		}
 		
-		if (!is_integer(key($table))) {
+		if (is_array($data) && !is_integer(key($data))) {
 			// internal table should be a table format but an associative
 			// array could be passed as the first (and only) row of that table
-			$table = array($table);
+			$table = array($data);
+		} elseif (is_array($data) && is_integer(key($data))) {
+			$table = $data;
+		} else {
+			throw new \Exception('nest expects param data to form an plain object or an array of plain objects (forming a table)');
 		}
 		
-		if ($propertyMapping === null) {
+		if ($structPropToColumnMap === null && !empty($table)) {
 			// property mapping not specified, determine it from column names
-			$propertyMapping = static::propertyMappingFromColumnHints(array_keys($table[0]));
+			$structPropToColumnMap = self::structPropToColumnMapFromColumnHints(array_keys($table[0]));
 		}
 		
-		if (empty($propertyMapping)) {
+		if ($structPropToColumnMap === null) {
 			// properties is empty, can't form structure or determine content
 			// for a list. Assume a structure unless listOnEmpty
 			return $listOnEmpty ? array() : null;
-		}
-		if (isset($propertyMapping[0]) && empty($propertyMapping[0])) {
-			// should return a list but don't know anything about the structure
-			// of the items in the list, return empty list
-			return array();
+		} elseif (empty($table)) {
+			// table is empty, return the appropriate empty result based on input definition
+			return is_integer(key($structPropToColumnMap)) ? array() : null;
 		}
 		
-		// precalculate identity columns in advance to row processing, works
-		// by removing columns that don't belong
-		$identityMapping = array_merge_recursive($propertyMapping);
-		static::filterToIdentityMapping($identityMapping);
+		// COMPLETE VALIDATING PARAMS AND BASIC INITIALIZATION
 		
-		// precalculate list of contained properties for each possible
-		// structure, indexed by identity columns
-		$propertyListMap = array();
-		static::populatePropertyListMap($propertyListMap, $propertyMapping);
+		$meta = self::buildMeta($structPropToColumnMap);
 		
-		// default is either an empty list or null structure
-		$structure = is_integer(key($propertyMapping)) ? array() : null;
+		// BUILD FROM TABLE
 		
-		// initialize map for keys of identity columns to the nested structures
-		$mapByIndentityKeyToStruct = array();
+		// struct is populated inside the build function
+		$struct = array('base' => null);
 		
-		// row by row build up the data structure using the recursive
-		// populate function.
 		foreach ($table as $row) {
-			static::populateStructure($structure, $row, $resultType, $propertyMapping, $identityMapping, $propertyListMap, $mapByIndentityKeyToStruct);
+			foreach ($meta->primeIdColumnList as $primeIdColumn) {
+				// for each prime id column (corresponding to a to many relation or
+				// the top level) attempted to build an object
+				self::_nest($row, $primeIdColumn, $struct, $meta, $resultType);
+			}
 		}
 		
-		return $structure;
+		return $struct['base'];
 	}
 	
-	/**
-	 * Creates identityMapping by filtering out non identity properties from
-	 * from propertyMapping. Used by nest for efficient iteration.
-	 */
-	protected static function filterToIdentityMapping(&$identityMapping)
-	{
-		if (is_integer(key($identityMapping))) {
-			static::filterToIdentityMapping($identityMapping[0]);
-			return;
-		}
-		$propertyList = array_keys($identityMapping);
-		array_shift($propertyList);
-		foreach ($propertyList as $property) {
-			if (is_array($identityMapping[$property])) {
-				static::filterToIdentityMapping($identityMapping[$property]);
-			} else {
-				unset($identityMapping[$property]);
-			}
-		}
-	}
-	
-	/**
-	 * Create a list of non identity properties by identity column. Used by
-	 * nest for efficient iteration.
-	 */
-	protected static function populatePropertyListMap(&$propertyListMap, $propertyMapping)
-	{
-		if (is_integer(key($propertyMapping))) {
-			static::populatePropertyListMap($propertyListMap, $propertyMapping[0]);
-			return;
-		}
-		$identityColumn = current($propertyMapping);
-		foreach ($propertyMapping as $property => $column) {
-			if (is_array($column)) {
-				static::populatePropertyListMap($propertyListMap, $column);
-			} else {
-				if (!isset($propertyListMap[$identityColumn])) {
-					$propertyListMap[$identityColumn] = array();
-				}
-				$propertyListMap[$identityColumn][] = $property;
-			}
-		}
-	}
-	
-	/**
-	 * Populate structure with row data based propertyMapping with useful hints
-	 * coming from diff, identityMapping and propertyListMap
-	 */
-	protected static function populateStructure(&$structure, $row, $resultType, $propertyMapping, $identityMapping, $propertyListMap, &$mapByIndentityKeyToStruct)
-	{
-		if (empty($propertyMapping)) {
-			// nothing to do
+	// defines function that can be called recursively
+	protected static function _nest($row, $idColumn, &$struct, &$meta, $resultType) {
+		$value = $row[$idColumn];
+		
+		if ($value === null) {
+			// nothing to build
 			return;
 		}
 		
-		if (is_integer(key($identityMapping))) {
-			// list of nested structures
-			$identityColumn = current($identityMapping[0]);
-			
-			if ($identityColumn === false) {
+		// only really concerned with the meta data for this identity column
+		$objMeta = $meta->idMap[$idColumn];
+		
+		if (array_key_exists($value . '', $objMeta->cache)) {
+			// object already exists in cache
+			if ($objMeta->containingIdUsage === null) {
+				// at the top level, parent is root
 				return;
 			}
 			
-			if ($row[$identityColumn] === null) {
-				// structure is empty
-				$structure = array();
+			$containingId = $row[$objMeta->containingColumn];
+			if (array_key_exists($value . '', $objMeta->containingIdUsage)
+				&& array_key_exists($containingId . '', $objMeta->containingIdUsage[$value . ''])
+			) {
+				// already placed as to many relation in container, done
 				return;
 			}
 			
-			if (isset($mapByIndentityKeyToStruct[$row[$identityColumn]])) {
-				// structure has already been started, further changes would
-				// be nested in deeper structure, get the position in the
-				// list of existing structure
-				$pos = $mapByIndentityKeyToStruct[$row[$identityColumn]][0];
-			} else {
-				if (empty($structure)) {
-					// first in the list
-					$pos = 0;
-				} else {
-					// add to end of the list
-					end($structure);
-					$pos = key($structure) + 1;
-				}
-				// create new structure in the list
-				if ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
-					$newStructure = array();
-				} elseif ($resultType === NestHydration::SPL_OBJECT) {
-					$newStructure = new \StdClass;
-				} elseif ($resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
-					$newStructure = new \NestHydration\ArrayAccess();
-				} else {
-					throw new \Exception('invalid result type');
-				}
-				$structure[$pos] = $newStructure;
-				
-				// store structure identity key for quick reference if needed later
-				$mapByIndentityKeyToStruct[$row[$identityColumn]] = array($pos, array());
-			}
+			// not already placed as to many relation in container
+			$obj = &$objMeta->cache[$value . ''];
+		} else {
+			// don't have an object defined for this yet, create it
 			
-			// populate the structure in the list
-			static::populateStructure($structure[$pos], $row, $resultType, $propertyMapping[0], $identityMapping[0], $propertyListMap, $mapByIndentityKeyToStruct[$row[$identityColumn]][1]);
-			return;
-		}
-		
-		// not a list, so a structure
-		
-		// get the identity column and property, move identity mapping along
-		$identityProperty = key($identityMapping);
-		$identityColumn = array_shift($identityMapping);
-		
-		if ($row[$identityColumn] === null) {
-			// the identity column null, the structure doesn't exist
-			return;
-		} elseif ($structure === null) {
-			if ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
-				$structure = array();
+			// create new structure in the list
+			if ($resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
+				$obj = new \NestHydration\ArrayAccess();
 			} elseif ($resultType === NestHydration::SPL_OBJECT) {
-				$structure = new \StdClass;
-			} elseif ($resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
-				$structure = new \NestHydration\ArrayAccess();
-			} else {
-				throw new \Exception('invalid result type');
+				$obj = new \StdClass;
+			} else { // ASSOCIATIVE_ARRAY
+				$obj = array();
+			}
+			
+			$objMeta->cache[$value . ''] = &$obj;
+			
+			// copy in properties from table data
+			foreach ($objMeta->valueList as $frag) {
+				if ($resultType === NestHydration::SPL_OBJECT) {
+					$prop = $frag->prop;
+					$obj->$prop = $row[$frag->column];
+				} else { // ASSOCIATIVE_ARRAY, ARRAY_ACCESS_OBJECT
+					$obj[$frag->prop] = $row[$frag->column];
+				}
+			}
+			
+			// initialize empty to many relations, they will be populated when
+			// those objects build themselve and find this containing object
+			foreach ($objMeta->toManyPropList as $prop) {
+				if ($resultType === NestHydration::SPL_OBJECT) {
+					$obj->$prop = array();
+				} else { // ASSOCIATIVE_ARRAY, ARRAY_ACCESS_OBJECT
+					$obj[$prop] = array();
+				}
+			}
+			
+			// intialize null to one relations and then recursively build them
+			foreach ($objMeta->toOneList as $frag) {
+				if ($resultType === NestHydration::SPL_OBJECT) {
+					$prop = $frag->prop;
+					$obj->$prop = null;
+				} else { // ASSOCIATIVE_ARRAY, ARRAY_ACCESS_OBJECT
+					$obj[$frag->prop] = null;
+				}
+				self::_nest($row, $frag->column, $struct, $meta, $resultType);
 			}
 		}
 		
-		// go through properties for structure and copy from row
-		foreach ($propertyListMap[$identityColumn] as $property) {
-			// pointer to the structure property
-			if ($resultType === NestHydration::SPL_OBJECT || $resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
-				$structurePropertyPointer = &$structure->$property;
-			} elseif ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
-				$structurePropertyPointer = &$structure[$property];
+		// link from the parent
+		if ($objMeta->containingColumn === null) {
+			// parent is the top level
+			if ($objMeta->isOneOfMany) {
+				// it is an array
+				if ($struct === null) {
+					$struct = array();
+				}
+				$struct['base'][] = &$obj;
 			} else {
-				throw new \Exception('invalid result type');
+				// it is this object
+				$struct['base'] = &$obj;
+			}
+		} else {
+			$containingId = $row[$objMeta->containingColumn];
+			$container = &$meta->idMap[$objMeta->containingColumn]->cache[$containingId . ''];
+			
+			if ($objMeta->isOneOfMany) {
+				// it is an array
+				if ($resultType === NestHydration::SPL_OBJECT || $resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
+					$prop = $objMeta->ownProp;
+					$propObj = &$container->$prop;
+					$propObj[] = &$obj;
+				} else { // ASSOCIATIVE_ARRAY
+					$container[$objMeta->ownProp][] = &$obj;
+				}
+			} else {
+				// it is this object
+				if ($resultType === NestHydration::SPL_OBJECT || $resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
+					$prop = $objMeta->ownProp;
+					$container->$prop = &$obj;
+				} else { // ASSOCIATIVE_ARRAY
+					$container[$objMeta->ownProp] = &$obj;
+				}
 			}
 			
-			$structurePropertyPointer = $row[$propertyMapping[$property]];
+			// record the containing id
+			if (!array_key_exists($value . '', $objMeta->containingIdUsage)) {
+				$objMeta->containingIdUsage[$value . ''] = array();
+			}
+			$objMeta->containingIdUsage[$value . ''][$containingId . ''] = true;
+		}
+	}
+	
+	/* Create a data structure that contains lookups and cache spaces for quick
+	 * reference and action for the workings of the nest method.
+	 */
+	protected static function buildMeta($structPropToColumnMap) {
+		// this data structure is populated by the _buildMeta function
+		$meta = (object) array(
+			'primeIdColumnList' => array(),
+			'idMap' => array(),
+		);
+		
+		if (empty($structPropToColumnMap)) {
+			throw new \Exception('invalid structPropToColumnMap format');
 		}
 		
-		// go through the nested structures remaining in identityMapping
-		foreach ($identityMapping as $property => $x) {
-			// pointer to the structure property
-			if ($resultType === NestHydration::SPL_OBJECT || $resultType === NestHydration::ARRAY_ACCESS_OBJECT) {
-				$structurePropertyPointer = &$structure->$property;
-			} elseif ($resultType === NestHydration::ASSOCIATIVE_ARRAY) {
-				$structurePropertyPointer = &$structure[$property];
-			} else {
-				throw new \Exception('invalid result type');
-			}
+		if (is_integer(key($structPropToColumnMap))) {
+			// call with first object, but inform _buidMeta it is an array
+			self::_buildMeta($structPropToColumnMap[0], true, null, null, $meta);
+		} else {
+			// register first column as prime id column
+			$meta->primeIdColumnList[] = key($structPropToColumnMap);
 			
-			if (!isset($structurePropertyPointer)) {
-				// nested structure doesn't already exist, initialize
-				$structurePropertyPointer = is_integer(key($identityMapping[$property])) ? array() : null;
-				$mapByIndentityKeyToStruct[$property] = array();
-			}
-			
-			// go into the nested structure
-			static::populateStructure($structurePropertyPointer, $row, $resultType, $propertyMapping[$property], $identityMapping[$property], $propertyListMap, $mapByIndentityKeyToStruct[$property]);
+			// construct the rest
+			self::_buildMeta($structPropToColumnMap, false, null, null, $meta);
 		}
+		
+		return $meta;
+	}
+	
+	// recursive internal function
+	protected static function _buildMeta($structPropToColumnMap, $isOneOfMany, $containingColumn, $ownProp, &$meta) {
+		if (empty($structPropToColumnMap)) {
+			throw new \Exception('invalid structPropToColumnMap format');
+		}
+		
+		$idColumn = $structPropToColumnMap[key($structPropToColumnMap)];
+		
+		if ($isOneOfMany) {
+			$meta->primeIdColumnList[] = $idColumn;
+		}
+		
+		$objMeta = (object) array(
+			'valueList' => array(),
+			'toOneList' => array(),
+			'toManyPropList' => array(),
+			'containingColumn' => $containingColumn,
+			'ownProp' => $ownProp,
+			'isOneOfMany' => $isOneOfMany === true,
+			'cache' => array(),
+			'containingIdUsage' => $containingColumn === null ? null : array(),
+		);
+		
+		foreach ($structPropToColumnMap as $prop => $column) {
+			if (is_string($column)) {
+				// value property
+				$objMeta->valueList[] = (object) array(
+					'prop' => $prop,
+					'column' => $column,
+				);
+			} elseif (is_array($column) && is_integer(key($column))) {
+				// list of objects / to many relation
+				$objMeta->toManyPropList[] = $prop;
+				
+				self::_buildMeta($column[0], true, $idColumn, $prop, $meta);
+			} else {
+				// object / to one relation
+				$subIdColumn = current($column);
+				
+				$objMeta->toOneList[] = (object) array(
+					'prop' => $prop,
+					'column' => $subIdColumn,
+				);
+				
+				self::_buildMeta($column, false, $idColumn, $prop, $meta);
+			}
+		}
+		
+		$meta->idMap[$idColumn] = $objMeta;
 	}
 	
 	/**
@@ -266,7 +304,7 @@ class NestHydration
 	 * in columnList. Used internally by nest when its propertyMapping param
 	 * is not specified.
 	 */
-	public static function propertyMappingFromColumnHints($columnList)
+	public static function structPropToColumnMapFromColumnHints($columnList)
 	{
 		$propertyMapping = array();
 		

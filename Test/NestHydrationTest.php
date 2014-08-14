@@ -3,6 +3,7 @@
 namespace NestHydration\Test;
 
 require __DIR__ . '/../NestHydration.php';
+require __DIR__ . '/../ArrayAccess.php';
 
 use NestHydration\NestHydration;
 
@@ -62,6 +63,7 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 	
 	/**
 	 * @covers CoursePark\Service\BaseService::nest
+	 * @expectedException \Exception
 	 */
 	public function testNest_noProperties()
 	{
@@ -69,12 +71,11 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$propertyMapping = array();
 		
 		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
-		
-		$this->assertNull($nested, 'should be null');
 	}
 	
 	/**
 	 * @covers CoursePark\Service\BaseService::nest
+	 * @expectedException \Exception
 	 */
 	public function testNest_listNoProperties()
 	{
@@ -84,8 +85,6 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		$propertyMapping = array(array());
 		
 		$nested = NestHydration::nest($table, NestHydration::ASSOCIATIVE_ARRAY, $propertyMapping);
-		
-		$this->assertCount(0, $nested, 'should be an empty list');
 	}
 	
 	/**
@@ -104,6 +103,7 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		
 		$this->assertArrayHasKey('col1', $nested, 'should be an associative array');
 		$this->assertEquals('1', $nested['col1'], 'should have different value for property');
+		
 		$this->assertCount(3, $nested, 'should have 3 properties in structure');
 	}
 	
@@ -574,6 +574,41 @@ class NestHydrationTest extends \PHPUnit_Framework_TestCase
 		
 		$this->assertObjectHasAttribute('sub', $nested[1], 'nested sub should have the specified property');
 		$this->assertEquals('sub 2b', $nested[1]->sub[1]->col2, 'nested sub should have different value for property');
+	}
+	
+	/**
+	 * @covers CoursePark\Service\BaseService::nest
+	 */
+	public function testNest_autoNesting_listWithNestedOneToManyArrayAccessObject()
+	{
+		$table = array(
+			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub 1a', '_sub__col2' => 'sub 2a', '_sub__col3' => 'sub 3a'),
+			array('_col1' => '1a', '_col2' => '2a', '_col3' => '3a', '_sub__col1' => 'sub 1b', '_sub__col2' => 'sub 2b', '_sub__col3' => 'sub 3b'),
+			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub 1a', '_sub__col2' => 'sub 2a', '_sub__col3' => 'sub 3a'),
+			array('_col1' => '1b', '_col2' => '2b', '_col3' => '3b', '_sub__col1' => 'sub 1b', '_sub__col2' => 'sub 2b', '_sub__col3' => 'sub 3b'),
+		);
+		
+		$nested = NestHydration::nest($table, NestHydration::ARRAY_ACCESS_OBJECT);
+		
+		$this->assertCount(2, $nested, 'should be a list of structures 2 long');
+		
+		$this->assertObjectHasAttribute('col3', $nested[0], 'should have the specified property');
+		$this->assertEquals('3a', $nested[0]->col3, 'should have different value for property');
+		
+		$this->assertObjectHasAttribute('sub', $nested[0], 'nested sub should have the specified property');
+		$this->assertEquals('sub 3a', $nested[0]->sub[0]->col3, 'nested sub should have different value for property');
+		
+		$this->assertObjectHasAttribute('sub', $nested[1], 'nested sub should have the specified property');
+		$this->assertEquals('sub 2b', $nested[1]->sub[1]->col2, 'nested sub should have different value for property');
+		
+		$this->assertObjectHasAttribute('col3', $nested[0], 'should have the specified property');
+		$this->assertEquals('3a', $nested[0]['col3'], 'should have different value for property');
+		
+		$this->assertObjectHasAttribute('sub', $nested[0], 'nested sub should have the specified property');
+		$this->assertEquals('sub 3a', $nested[0]['sub'][0]['col3'], 'nested sub should have different value for property');
+		
+		$this->assertObjectHasAttribute('sub', $nested[1], 'nested sub should have the specified property');
+		$this->assertEquals('sub 2b', $nested[1]['sub'][1]['col2'], 'nested sub should have different value for property');
 	}
 	
 	/**

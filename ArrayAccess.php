@@ -3,7 +3,7 @@
 namespace NestHydration;
 
 class ArrayAccess
-	implements \ArrayAccess
+	implements \ArrayAccess, \Countable
 {
 	public function offsetSet($offset, $value)
 	{
@@ -23,5 +23,10 @@ class ArrayAccess
 	public function offsetExists($offset)
 	{
 		return isset($this->$offset);
+	}
+	
+	public function count()
+	{
+		return count((array) $this);
 	}
 }
