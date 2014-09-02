@@ -37,3 +37,7 @@ foreach ($userList as $user) {
     }
 }
 ```
+
+Related Projects
+----------------
+- [NestHydrationJS](https://github.com/CoursePark/NestHydrationJS/tree/master) : A port of this project. In truth many improvements were made while implementing the JS version and these made their way back to this (PHP) version.
